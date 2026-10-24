@@ -1,0 +1,7 @@
+# Dataset and experiment paths
+data_dir: "data"
+raw_data_dir: "data/raw"
+metadata_path: "data/metadata.csv"
+results_dir: "results"
+checkpoints_dir: "checkpoints"
+evaluation_dir: "src/evaluation"

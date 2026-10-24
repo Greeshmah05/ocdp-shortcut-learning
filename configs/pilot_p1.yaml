@@ -1,0 +1,29 @@
+# Pilot P1: Pooling Heads on Frozen Features (Go/No-Go 1)
+experiment: "pilot_p1"
+supervision_tier: "T3"  # Selected on validation worst-class accuracy
+
+heads:
+  - "gap"
+  - "abmil"
+  - "topk"
+  - "dar"
+  - "ocdp"
+
+ocdp_hyperparameters:
+  gce_q: 0.7
+  rho_area: 0.3
+  lambda_ctx: 1.0
+  lambda_area: 0.5
+  warmup_epochs: 2
+  w_min: 0.2
+  w_max: 4.0
+
+training:
+  optimizer: "adamw"
+  lr: 0.001
+  weight_decay: 0.0001
+  epochs: 15
+  batch_size: 64
+
+seeds: [42, 100, 2024]
+output_dir: "results/pilot_p1"

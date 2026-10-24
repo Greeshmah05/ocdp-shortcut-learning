@@ -1,0 +1,30 @@
+# End-to-End OCDP Training Configuration
+experiment: "ocdp_end_to_end"
+supervision_tier: "T3"
+
+model:
+  backbone: "resnet50"
+  pretrained: true
+  head: "ocdp"
+  num_classes: 2
+
+ocdp_hyperparameters:
+  gce_q: 0.7
+  rho_area: 0.3
+  lambda_ctx: 1.0
+  lambda_area: 0.5
+  lambda_cons: 0.5
+  warmup_epochs: 2
+  w_min: 0.2
+  w_max: 4.0
+
+training:
+  optimizer: "adamw"
+  backbone_lr: 0.00001
+  head_lr: 0.0001
+  weight_decay: 0.0001
+  epochs: 8
+  batch_size: 32
+
+seeds: [42, 100, 2024]
+output_dir: "results/ocdp"

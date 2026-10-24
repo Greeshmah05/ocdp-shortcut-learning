@@ -1,0 +1,35 @@
+{
+  "splits": {
+    "train": {
+      "total": 4795,
+      "group_counts": {
+        "0": 3498,
+        "1": 184,
+        "2": 56,
+        "3": 1057
+      },
+      "duplicates_within_split": 0
+    },
+    "validation": {
+      "total": 1199,
+      "group_counts": {
+        "0": 467,
+        "1": 466,
+        "2": 133,
+        "3": 133
+      },
+      "duplicates_within_split": 0
+    },
+    "test": {
+      "total": 5794,
+      "group_counts": {
+        "0": 2255,
+        "1": 2255,
+        "2": 642,
+        "3": 642
+      },
+      "duplicates_within_split": 0
+    }
+  },
+  "cross_split_leakage": 0
+}

@@ -1,0 +1,4 @@
+Split,Total,G0 (Land/Land),G1 (Land/Water),G2 (Water/Land),G3 (Water/Water)
+Train,4795,3498,184,56,1057
+Validation,1199,467,466,133,133
+Test,5794,2255,2255,642,642

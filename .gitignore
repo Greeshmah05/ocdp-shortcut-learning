@@ -1,0 +1,18 @@
+# Git ignore for OCDP project
+data/
+checkpoints/
+results/*/checkpoints/
+*.tar.gz
+*.zip
+*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+docx_extracted_text.txt
+research_plan_v2_text.txt
+shortcut-starter-kit (1).zip
