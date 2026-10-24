@@ -1,6 +1,8 @@
 # Git ignore for OCDP project
-data/
-checkpoints/
+/data/
+/checkpoints/
+/.venv/
+/shortcut-starter-kit/
 results/*/checkpoints/
 *.tar.gz
 *.zip
@@ -16,3 +18,4 @@ build/
 docx_extracted_text.txt
 research_plan_v2_text.txt
 shortcut-starter-kit (1).zip
+
