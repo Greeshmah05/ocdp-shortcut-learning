@@ -134,7 +134,7 @@ $$\mathcal{L} = \mathcal{L}_{\text{obj}} + \lambda_g \mathcal{L}_{\text{ctx}} + 
 ### Installation
 ```bash
 # Clone repository
-git clone https://github.com/internship/ocdp-shortcut-learning.git
+git clone https://github.com/Greeshmah05/ocdp-shortcut-learning.git
 cd ocdp-shortcut-learning
 
 # Install pinned dependencies
