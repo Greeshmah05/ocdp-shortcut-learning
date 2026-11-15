@@ -82,7 +82,12 @@ def extract_spatial_features(
     return features, labels, groups
 
 
-def build_head(head_type: str, in_features: int = 2048, num_classes: int = 2) -> nn.Module:
+def build_head(
+    head_type: str,
+    in_features: int = 2048,
+    num_classes: int = 2,
+    detach_context_gate: bool = True
+) -> nn.Module:
     """Factory for pooling heads."""
     head_type = head_type.lower()
     if head_type == "gap":
@@ -94,7 +99,12 @@ def build_head(head_type: str, in_features: int = 2048, num_classes: int = 2) ->
     elif head_type == "dar":
         return DARHead(in_features=in_features, hidden_dim=256, num_classes=num_classes)
     elif head_type == "ocdp":
-        return OCDPHead(in_features=in_features, hidden_dim=256, num_classes=num_classes)
+        return OCDPHead(
+            in_features=in_features,
+            hidden_dim=256,
+            num_classes=num_classes,
+            detach_context_gate=detach_context_gate
+        )
     else:
         raise ValueError(f"Unknown head type: {head_type}")
 
@@ -116,7 +126,15 @@ def train_head_on_features(
     """
     set_seed(seed)
     num_classes = 2
-    head = build_head(head_type, in_features=2048, num_classes=num_classes).to(device)
+    is_ocdp = (head_type.lower() == "ocdp")
+    ocdp_cfg = config.get("ocdp_hyperparameters", {})
+    detach_ctx = ocdp_cfg.get("detach_context_gate", True)
+    head = build_head(
+        head_type,
+        in_features=2048,
+        num_classes=num_classes,
+        detach_context_gate=detach_ctx
+    ).to(device)
 
     epochs = config.get("training", {}).get("epochs", 15)
     batch_size = config.get("training", {}).get("batch_size", 64)
@@ -126,28 +144,36 @@ def train_head_on_features(
     optimizer = torch.optim.AdamW(head.parameters(), lr=lr, weight_decay=weight_decay)
 
     # OCDP specific parameters
-    is_ocdp = (head_type.lower() == "ocdp")
-    ocdp_cfg = config.get("ocdp_hyperparameters", {})
+    num_samples = len(train_feats)
     gce_loss_fn = GeneralizedCrossEntropyLoss(q=ocdp_cfg.get("gce_q", 0.7), reduction="none")
-    area_loss_fn = AreaPriorLoss(rho=ocdp_cfg.get("rho_area", 0.3))
+    area_loss_fn = AreaPriorLoss(
+        rho=ocdp_cfg.get("rho_area", 0.3),
+        mode=ocdp_cfg.get("area_mode", "l2"),
+        sharpness_coeff=ocdp_cfg.get("sharpness_coeff", 0.1)
+    )
     reweighter = DynamicSampleReweighting(
-        w_min=ocdp_cfg.get("w_min", 0.2),
-        w_max=ocdp_cfg.get("w_max", 4.0)
+        w_min=ocdp_cfg.get("w_min", 0.1),
+        w_max=ocdp_cfg.get("w_max", 10.0),
+        gamma=ocdp_cfg.get("weight_gamma", 1.5),
+        momentum=ocdp_cfg.get("ema_momentum", 0.7),
+        num_samples=num_samples
     )
     lambda_ctx = ocdp_cfg.get("lambda_ctx", 1.0)
-    lambda_area = ocdp_cfg.get("lambda_area", 0.5)
+    lambda_area = ocdp_cfg.get("lambda_area", 1.0)
     warmup_epochs = ocdp_cfg.get("warmup_epochs", 2)
 
     ce_loss_none = nn.CrossEntropyLoss(reduction="none")
     ce_loss_mean = nn.CrossEntropyLoss(reduction="mean")
 
-    train_ds = TensorDataset(train_feats, train_labels)
+    indices = torch.arange(num_samples)
+    train_ds = TensorDataset(train_feats, train_labels, indices)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     epoch_logs = []
     best_t3_metric = -1.0  # Best worst-class accuracy (T3 rule)
     best_t2_metric = -1.0  # Best worst-group accuracy (T2 logged for comparison)
     best_val_metrics = {}
+    best_state_dict = None
 
     for epoch in range(1, epochs + 1):
         head.train()
@@ -155,7 +181,7 @@ def train_head_on_features(
         gate_means = []
         batch_count = 0
 
-        for feats_b, ys_b in train_loader:
+        for feats_b, ys_b, idx_b in train_loader:
             feats_b = feats_b.to(device)
             ys_b = ys_b.to(device)
             optimizer.zero_grad()
@@ -171,7 +197,11 @@ def train_head_on_features(
                 if epoch <= warmup_epochs:
                     loss_obj = ce_obj_per_sample.mean()
                 else:
-                    weights = reweighter(ce_obj_per_sample.detach(), ce_ctx_per_sample.detach())
+                    weights = reweighter(
+                        ce_obj_per_sample.detach(),
+                        ce_ctx_per_sample.detach(),
+                        sample_indices=idx_b.to(device)
+                    )
                     loss_obj = (weights * ce_obj_per_sample).mean()
 
                 loss_ctx = gce_loss_fn(y_ctx, ys_b).mean()
@@ -230,6 +260,7 @@ def train_head_on_features(
             best_val_metrics = dict(val_metrics)
             best_val_metrics["selected_epoch"] = epoch
             best_val_metrics["selection_tier"] = "T3 (Worst-Class Acc)"
+            best_state_dict = {k: v.cpu().clone() for k, v in head.state_dict().items()}
 
         if t2_score > best_t2_metric:
             best_t2_metric = t2_score
@@ -251,7 +282,8 @@ def train_head_on_features(
         "supervision_tier": "T3",
         "best_val_metrics": best_val_metrics,
         "best_t2_val_wga": best_t2_metric,
-        "epoch_logs": epoch_logs
+        "epoch_logs": epoch_logs,
+        "best_state_dict": best_state_dict or {k: v.cpu().clone() for k, v in head.state_dict().items()}
     }
 
 
@@ -319,7 +351,16 @@ def run_pilot_p1_experiments(
                 seed=seed,
                 device=device
             )
-            head_results.append(res)
+            ckpt_dir = os.path.join(output_dir, "checkpoints")
+            os.makedirs(ckpt_dir, exist_ok=True)
+            if "best_state_dict" in res and res["best_state_dict"] is not None:
+                torch.save(res["best_state_dict"], os.path.join(ckpt_dir, f"{head_type}_seed{seed}.pt"))
+                if head_type == "ocdp" and seed == 42:
+                    torch.save(res["best_state_dict"], "checkpoints/best_ocdp_head.pt")
+
+            # Clean state dict from json results
+            res_for_json = {k: v for k, v in res.items() if k != "best_state_dict"}
+            head_results.append(res_for_json)
             best_m = res["best_val_metrics"]
             summary_rows.append({
                 "head": head_type,

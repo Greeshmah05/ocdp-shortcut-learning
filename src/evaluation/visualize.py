@@ -8,6 +8,9 @@ Generates publication-quality figures:
 """
 
 import os
+import tempfile
+os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "matplotlib"))
+
 import json
 import numpy as np
 import pandas as pd

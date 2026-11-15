@@ -4,6 +4,7 @@
 /.venv/
 /shortcut-starter-kit/
 results/*/checkpoints/
+*.pt
 *.tar.gz
 *.zip
 *.log

@@ -111,11 +111,13 @@ class OCDPHead(nn.Module):
         in_features: int = 2048,
         hidden_dim: int = 256,
         num_classes: int = 2,
-        eps: float = 1e-6
+        eps: float = 1e-6,
+        detach_context_gate: bool = True
     ):
         super().__init__()
         self.num_classes = num_classes
         self.eps = eps
+        self.detach_context_gate = detach_context_gate
         
         # 1. Evidence head: Wo * f_u + bo
         self.evidence_conv = nn.Conv2d(in_features, num_classes, kernel_size=1)
@@ -168,7 +170,11 @@ class OCDPHead(nn.Module):
         if return_context:
             c = self.context_conv(x)  # [B, K, H, W]
             c_flat = c.view(B, self.num_classes, H * W)
-            inv_a_flat = 1.0 - a_flat
+            # Stop gradient on gate: prevents context sink from stealing object pixels
+            if self.detach_context_gate:
+                inv_a_flat = 1.0 - a_flat.detach()
+            else:
+                inv_a_flat = 1.0 - a_flat
             inv_a_sum = inv_a_flat.sum(dim=-1) + self.eps  # [B, 1]
             y_ctx = (inv_a_flat * c_flat).sum(dim=-1) / inv_a_sum  # [B, K]
             

@@ -22,6 +22,17 @@ PUBLISHED_BASELINES = [
 ]
 
 
+def dataframe_to_markdown(df: pd.DataFrame) -> str:
+    """Converts DataFrame to markdown table without external dependencies like tabulate."""
+    headers = list(df.columns)
+    lines = []
+    lines.append("| " + " | ".join(str(h) for h in headers) + " |")
+    lines.append("| " + " | ".join([":---"] * len(headers)) + " |")
+    for _, row in df.iterrows():
+        lines.append("| " + " | ".join(str(row[h]) for h in headers) + " |")
+    return "\n".join(lines)
+
+
 def summarize_pilot_results(summary_csv_path: str = "results/pilot_p1/pilot_p1_summary.csv") -> str:
     """Generates markdown summary of the Pilot P1 head comparisons."""
     if not os.path.exists(summary_csv_path):
@@ -56,7 +67,10 @@ def summarize_pilot_results(summary_csv_path: str = "results/pilot_p1/pilot_p1_s
         })
 
     summary_df = pd.DataFrame(rows)
-    return summary_df.to_markdown(index=False)
+    try:
+        return summary_df.to_markdown(index=False)
+    except Exception:
+        return dataframe_to_markdown(summary_df)
 
 
 def generate_comparative_table(pilot_csv_path: str = "results/pilot_p1/pilot_p1_summary.csv") -> str:

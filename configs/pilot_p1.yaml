@@ -13,10 +13,15 @@ ocdp_hyperparameters:
   gce_q: 0.7
   rho_area: 0.3
   lambda_ctx: 1.0
-  lambda_area: 0.5
+  lambda_area: 1.0
   warmup_epochs: 2
-  w_min: 0.2
-  w_max: 4.0
+  w_min: 0.1
+  w_max: 10.0
+  weight_gamma: 1.5
+  ema_momentum: 0.7
+  detach_context_gate: true
+  area_mode: "l2"
+  sharpness_coeff: 0.1
 
 training:
   optimizer: "adamw"

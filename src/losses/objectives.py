@@ -45,46 +45,83 @@ class GeneralizedCrossEntropyLoss(nn.Module):
 class AreaPriorLoss(nn.Module):
     """
     Area prior loss: penalizes deviations of the average gate value from target ratio rho.
-    L_area = (mean(a) - rho)^2
-    Prevents gate saturation (a -> 0 or a -> 1).
+    Supports L2 penalty ((mean(a) - rho)^2) and L1/smooth penalty with optional boundary sharpness.
     """
-    def __init__(self, rho: float = 0.3):
+    def __init__(self, rho: float = 0.3, mode: str = "l2", sharpness_coeff: float = 0.0):
         super().__init__()
         self.rho = rho
+        self.mode = mode
+        self.sharpness_coeff = sharpness_coeff
 
     def forward(self, gate: torch.Tensor) -> torch.Tensor:
         # gate: [B, 1, H, W]
         mean_gate_per_sample = gate.mean(dim=(1, 2, 3))
-        loss = (mean_gate_per_sample - self.rho) ** 2
-        return loss.mean()
+        if self.mode == "l1":
+            area_loss = torch.abs(mean_gate_per_sample - self.rho).mean()
+        else:
+            area_loss = ((mean_gate_per_sample - self.rho) ** 2).mean()
+
+        if self.sharpness_coeff > 0.0:
+            # Penalizes indecisive gate values near 0.5 (encourages 0 or 1)
+            sharp_loss = (gate * (1.0 - gate)).mean()
+            return area_loss + self.sharpness_coeff * sharp_loss
+        return area_loss
 
 
 class DynamicSampleReweighting(nn.Module):
     """
     Calculates per-example weights based on context sink error vs object path error:
-    w_i = CE_ctx,i / (CE_ctx,i + CE_obj,i)
-    Bias-conflicting examples (which the shortcut sink gets wrong) receive higher weights.
+    w_i = (CE_ctx,i / (CE_ctx,i + CE_obj,i))^gamma
+    Tracks weights with Exponential Moving Average (EMA) across epochs to eliminate batch noise.
+    Bias-conflicting examples receive elevated weights.
     """
     def __init__(
         self,
         w_min: float = 0.1,
-        w_max: float = 5.0,
+        w_max: float = 10.0,
+        gamma: float = 1.0,
+        momentum: float = 0.7,
+        num_samples: Optional[int] = None,
         eps: float = 1e-6
     ):
         super().__init__()
         self.w_min = w_min
         self.w_max = w_max
+        self.gamma = gamma
+        self.momentum = momentum
         self.eps = eps
+        if num_samples is not None:
+            self.register_buffer("ema_weights", torch.ones(num_samples))
+        else:
+            self.ema_weights = None
 
     def forward(
         self,
         ce_obj_per_sample: torch.Tensor,
-        ce_ctx_per_sample: torch.Tensor
+        ce_ctx_per_sample: torch.Tensor,
+        sample_indices: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        # Normalized per-sample relative error of the sink
-        raw_weights = ce_ctx_per_sample / (ce_ctx_per_sample + ce_obj_per_sample + self.eps)
+        # Relative error of the context sink
+        ratio = ce_ctx_per_sample / (ce_ctx_per_sample + ce_obj_per_sample + self.eps)
+        if self.gamma != 1.0:
+            raw_weights = torch.pow(ratio, self.gamma)
+        else:
+            raw_weights = ratio
+
+        # EMA smoothing across epochs if sample indices are tracked
+        if sample_indices is not None and self.ema_weights is not None:
+            device = raw_weights.device
+            if self.ema_weights.device != device:
+                self.ema_weights = self.ema_weights.to(device)
+            old_w = self.ema_weights[sample_indices]
+            updated_w = self.momentum * old_w + (1.0 - self.momentum) * raw_weights
+            self.ema_weights[sample_indices] = updated_w.detach()
+            target_weights = updated_w
+        else:
+            target_weights = raw_weights
+
         # Scale to mean 1.0 before clipping
-        scaled_weights = raw_weights / (raw_weights.mean() + self.eps)
+        scaled_weights = target_weights / (target_weights.mean() + self.eps)
         clipped_weights = torch.clamp(scaled_weights, min=self.w_min, max=self.w_max)
         # Re-normalize batch weights so sum(w) = B
         normalized_weights = clipped_weights / (clipped_weights.mean() + self.eps)
