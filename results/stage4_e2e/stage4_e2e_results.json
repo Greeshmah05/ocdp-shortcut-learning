@@ -1,0 +1,46 @@
+[
+  {
+    "seed": 42,
+    "supervision_tier": "T3",
+    "best_val_metrics": {
+      "overall_acc": 0.578125,
+      "mean_group_acc": 0.6434884559884559,
+      "worst_group_acc": 0.36363636363636365,
+      "worst_class_acc": 0.46511627906976744,
+      "weighted_avg_acc": 0.7114534289716771,
+      "G0_acc": 0.75,
+      "G1_acc": 0.8888888888888888,
+      "G2_acc": 0.36363636363636365,
+      "G3_acc": 0.5714285714285714,
+      "G0_count": 12,
+      "G1_count": 9,
+      "G2_count": 22,
+      "G3_count": 21,
+      "C0_acc": 0.8095238095238095,
+      "C1_acc": 0.46511627906976744,
+      "total_samples": 64,
+      "ece": 0.06929486151784661,
+      "brier_score": 0.2483517275589035,
+      "minority_detection_auroc": 0.5171065493646139,
+      "minority_detection_auprc": 0.5381973455820652,
+      "selected_epoch": 1,
+      "selection_tier": "T3 (Worst-Class Acc)"
+    },
+    "best_t2_val_wga": 0.36363636363636365,
+    "epoch_logs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.2432618141174316,
+        "loss_obj": 0.650086909532547,
+        "loss_ctx": 0.5346891283988953,
+        "loss_area": 0.05797727033495903,
+        "loss_cons": 0.0005084583535790443,
+        "mean_gate": 0.4814988225698471,
+        "val_wga": 0.36363636363636365,
+        "val_mga": 0.6434884559884559,
+        "val_wca": 0.46511627906976744,
+        "val_overall": 0.578125
+      }
+    ]
+  }
+]

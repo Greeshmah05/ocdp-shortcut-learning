@@ -50,7 +50,8 @@ class ClassifierWithHead(nn.Module):
         head_type: str = "ocdp",
         num_classes: int = 2,
         pretrained_backbone: bool = True,
-        freeze_backbone: bool = False
+        freeze_backbone: bool = False,
+        **head_kwargs
     ):
         super().__init__()
         self.head_type = head_type.lower()
@@ -62,15 +63,15 @@ class ClassifierWithHead(nn.Module):
                 
         in_features = 2048
         if self.head_type == "gap":
-            self.head = GAPHead(in_features=in_features, num_classes=num_classes)
+            self.head = GAPHead(in_features=in_features, num_classes=num_classes, **head_kwargs)
         elif self.head_type == "abmil":
-            self.head = ABMILHead(in_features=in_features, num_classes=num_classes)
+            self.head = ABMILHead(in_features=in_features, num_classes=num_classes, **head_kwargs)
         elif self.head_type == "topk":
-            self.head = TopKHead(in_features=in_features, num_classes=num_classes)
+            self.head = TopKHead(in_features=in_features, num_classes=num_classes, **head_kwargs)
         elif self.head_type == "dar":
-            self.head = DARHead(in_features=in_features, num_classes=num_classes)
+            self.head = DARHead(in_features=in_features, num_classes=num_classes, **head_kwargs)
         elif self.head_type == "ocdp":
-            self.head = OCDPHead(in_features=in_features, num_classes=num_classes)
+            self.head = OCDPHead(in_features=in_features, num_classes=num_classes, **head_kwargs)
         else:
             raise ValueError(f"Unknown head type: {head_type}")
 
@@ -81,6 +82,9 @@ class ClassifierWithHead(nn.Module):
     ) -> Any:
         feats = self.backbone(x)
         if self.head_type == "ocdp":
-            return self.head(feats, return_context=return_context)
+            out = self.head(feats, return_context=return_context)
+            if return_context:
+                return out  # (y_obj, y_ctx, gate)
+            return out[0]   # y_obj [B, num_classes]
         else:
             return self.head(feats)

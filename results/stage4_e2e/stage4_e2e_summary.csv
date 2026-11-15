@@ -1,0 +1,2 @@
+model,seed,tier,overall_acc,G0_acc,G1_acc,G2_acc,G3_acc,mean_group_acc,worst_group_acc,weighted_avg_acc,t2_val_wga
+OCDP (End-to-End),42,T3,57.8125,75.0,88.88888888888889,36.36363636363637,57.14285714285714,64.3488455988456,36.36363636363637,71.14534289716771,36.36363636363637

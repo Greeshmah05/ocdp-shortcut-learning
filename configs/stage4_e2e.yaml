@@ -1,0 +1,36 @@
+# Stage 4: End-to-End OCDP with Backbone Fine-Tuning & Counterfactual Consistency
+experiment: "stage4_e2e_ocdp"
+supervision_tier: "T3"  # Selected on validation worst-class accuracy
+
+model:
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 2
+
+ocdp_hyperparameters:
+  gce_q: 0.7
+  rho_area: 0.3
+  lambda_ctx: 1.0
+  lambda_area: 1.0
+  lambda_cons: 1.0
+  warmup_epochs: 5
+  w_min: 0.1
+  w_max: 10.0
+  weight_gamma: 1.5
+  ema_momentum: 0.7
+  detach_context_gate: true
+  area_mode: "l2"
+  sharpness_coeff: 0.1
+
+training:
+  optimizer: "adamw"
+  lr_backbone: 0.00001   # 1e-5 for pretrained ResNet-50 backbone
+  lr_head: 0.0001        # 1e-4 for OCDP pooling & gating head
+  weight_decay: 0.0001
+  batch_size: 32
+  epochs: 50
+  grad_clip: 1.0
+
+seeds: [42, 100, 2024]
+output_dir: "results/stage4_e2e"
+
